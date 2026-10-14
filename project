@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Sui Pro Carousel Studio v3.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
+  <style>
+    body { background-color: #030508; color: #f8fafc; font-family: 'Pretendard', sans-serif; }
+    .bg-grid {
+      background-size: 30px 30px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+    .glass-box {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      backdrop-filter: blur(16px);
+    }
+    input, textarea, select {
+      background-color: #0f172a;
+      border: 1px solid #1e293b;
+      color: #f8fafc;
+      font-size: 0.8rem;
+      border-radius: 0.5rem;
+      padding: 0.45rem 0.7rem;
+      width: 100%;
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #38bdf8; }
+    label { font-size: 0.72rem; color: #94a3b8; font-weight: 600; display: block; margin-bottom: 0.2rem; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen p-5 flex flex-col xl:flex-row gap-6 items-start justify-center max-w-[1440px] mx-auto">
+
+  <!-- 좌측: 멀티 슬라이드 컨트롤 패널 -->
+  <div class="w-full xl:w-[500px] bg-slate-900/95 border border-slate-800 rounded-2xl p-5 space-y-4 max-h-[94vh] flex flex-col">
+    
+    <!-- 스튜디오 상단 헤더 -->
+    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+      <div>
+        <h2 class="text-base font-extrabold text-blue-400 flex items-center gap-2">
+          💧 SUI CAROUSEL STUDIO <span class="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded">v3.0 PRO</span>
+        </h2>
+        <p class="text-[11px] text-slate-400">다장 슬라이드 제작 · 4종 레이아웃 · ZIP 일괄 추출</p>
+      </div>
+      <select id="themeSelect" onchange="changeGlobalTheme(this.value)" class="w-36 text-xs font-bold">
+        <option value="blue">💧 Sui Blue</option>
+        <option value="emerald">🟢 Alpha Emerald</option>
+        <option value="purple">🟣 Tech Purple</option>
+        <option value="amber">🟠 Bitcoin Gold</option>
+      </select>
+    </div>
+
+    <!-- 슬라이드 탭 네비게이션 -->
+    <div class="space-y-2">
+      <div class="flex justify-between items-center">
+        <span class="text-xs font-bold text-slate-300">📑 슬라이드 목록 (<span id="slideCountText">4</span>장)</span>
+        <div class="flex gap-1.5">
+          <button onclick="addSlide()" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 border border-blue-500/30 text-xs px-2.5 py-1 rounded-lg font-semibold transition">+ 장 추가</button>
+          <button onclick="DuplicateSlide()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-lg font-semibold transition">복제</button>
+          <button onclick="deleteSlide()" class="bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/40 text-xs px-2.5 py-1 rounded-lg font-semibold transition">삭제</button>
+        </div>
+      </div>
+      <div id="slideTabs" class="flex gap-1.5 overflow-x-auto pb-1"></div>
+    </div>
+
+    <!-- 현재 슬라이드 레이아웃 선택 -->
+    <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 space-y-2">
+      <label class="text-blue-300">🎨 현재 슬라이드 레이아웃 (템플릿 선택)</label>
+      <div class="grid grid-cols-4 gap-1.5" id="layoutButtons">
+        <button onclick="setLayout('cover')" id="btn-cover" class="py-1.5 px-2 rounded-lg text-xs font-bold border transition">1. 표지 (Cover)</button>
+        <button onclick="setLayout('metrics')" id="btn-metrics" class="py-1.5 px-2 rounded-lg text-xs font-bold border transition">2. 핵심지표 3칸</button>
+        <button onclick="setLayout('versus')" id="btn-versus" class="py-1.5 px-2 rounded-lg text-xs font-bold border transition">3. VS 비교표</button>
+        <button onclick="setLayout('deepdive')" id="btn-deepdive" class="py-1.5 px-2 rounded-lg text-xs font-bold border transition">4. 심층·차트</button>
+      </div>
+    </div>
+
+    <!-- 공통 상/하단 설정 -->
+    <div class="grid grid-cols-3 gap-2 border-t border-slate-800 pt-3">
+      <div>
+        <label>상단 리서치 헤더</label>
+        <input type="text" id="gCategory" value="SUI ECOSYSTEM RESEARCH" oninput="updateGlobal()">
+      </div>
+      <div>
+        <label>발행 호수</label>
+        <input type="text" id="gIssue" value="OCT 2026 | ISSUE #01" oninput="updateGlobal()">
+      </div>
+      <div>
+        <label>내 계정 핸들</label>
+        <input type="text" id="gHandle" value="@Sui_Alpha_KR" oninput="updateGlobal()">
+      </div>
+    </div>
+
+    <!-- 동적 입력 폼 영역 -->
+    <div id="dynamicForm" class="space-y-3 border-t border-slate-800 pt-3 overflow-y-auto pr-1 flex-1"></div>
+
+    <!-- 하단 프리셋 저장/초기화 -->
+    <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-[11px] text-slate-500">
+      <span>💡 모든 수정사항은 브라우저에 자동 저장됩니다.</span>
+      <button onclick="resetDefault()" class="underline hover:text-slate-300">기본 4장 세트로 초기화</button>
+    </div>
+  </div>
+
+  <!-- 우측: 실시간 프리뷰 & 멀티 다운로드 -->
+  <div class="flex flex-col items-center">
+    <div class="w-[620px] flex justify-between items-center mb-3 bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-xl">
+      <div class="flex items-center gap-2">
+        <button onclick="prevSlide()" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-xs font-bold">◀ 이전</button>
+        <span id="previewPageIndicator" class="text-xs font-mono font-bold text-blue-400 px-2">1 / 4</span>
+        <button onclick="nextSlide()" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded text-xs font-bold">다음 ▶</button>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="downloadCurrentPNG()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition">
+          📸 현재 장 PNG 저장
+        </button>
+        <button id="zipBtn" onclick="downloadAllZIP()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 rounded-xl shadow-lg transition text-xs flex items-center gap-1.5">
+          📦 전체 슬라이드 일괄 다운로드 (ZIP)
+        </button>
+      </div>
+    </div>
+
+    <!-- 실제 캡처 캔버스 (620x620 -> 2배수 1240x1240 저장) -->
+    <div id="cardCanvas" class="w-[620px] h-[620px] bg-[#060a12] bg-grid relative overflow-hidden p-10 flex flex-col justify-between border border-slate-800 select-none">
+      <div id="orbTop" class="absolute w-[420px] h-[420px] -top-28 -right-28 pointer-events-none"></div>
+      <div id="orbBottom" class="absolute w-[340px] h-[340px] -bottom-24 -left-24 pointer-events-none"></div>
+
+      <svg class="absolute right-8 bottom-14 w-56 h-56 opacity-[0.03] pointer-events-none" viewBox="0 0 100 100" fill="currentColor">
+        <path d="M50 5 C30 30, 15 50, 15 70 A35 35 0 1 0 85 70 C85 50, 70 30, 50 5 Z"/>
+      </svg>
+
+      <!-- 상단 고정 헤더 -->
+      <div class="relative z-10 flex justify-between items-center">
+        <div class="flex items-center gap-2.5">
+          <div id="themeDot" class="w-2.5 h-2.5 rounded-full"></div>
+          <span id="canvasCategory" class="text-[11px] font-extrabold tracking-[0.22em] uppercase">SUI ECOSYSTEM RESEARCH</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="canvasIssue" class="text-[11px] font-mono text-slate-400 bg-slate-900/90 px-3 py-1 rounded-full border border-slate-800">OCT 2026 | ISSUE #01</span>
+          <span id="canvasPageBadge" class="text-[11px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-1 rounded-full">01 / 04</span>
+        </div>
+      </div>
+
+      <!-- 중앙 동적 본문 영역 -->
+      <div id="canvasBody" class="relative z-10 my-auto py-2"></div>
+
+      <!-- 하단 고정 푸터 -->
+      <div class="relative z-10 flex justify-between items-center pt-3.5 border-t border-slate-800/80 text-[11px] text-slate-400">
+        <div class="flex items-center gap-2">
+          <span id="canvasHandle" class="font-bold text-white">@Sui_Alpha_KR</span>
+          <span>|</span>
+          <span>AI & On-Chain Architecture Analysis</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="swipeHint" class="text-[10px] text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded">SWIPE ▶</span>
+          <span id="canvasRightFoot" class="font-mono font-semibold">POWERED BY SUI MOVE</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const defaultSlides = [
+  {
+    layout: 'cover',
+    badge: 'SUI DEEP DIVE SERIES #01',
+    title1: '왜 기관들은 솔라나 다음으로',
+    titleHighlight: '수이(Sui) 아키텍처',
+    title2: '를 매집하는가?',
+    subtitle: '단순 유행이 아닌 컴퓨터공학·병렬 처리 관점에서 본 차세대 L1 패권 분석',
+    bullets: [
+      '솔라나의 단일 상태 병목을 깨부순 객체(Object) 모델의 원리',
+      'Mysticeti 합의 엔진: 0.39초 최종성이 AI 에이전트에 필수인 이유',
+      'SUI 토크노믹스 언락 구조와 2026 하반기 기관 자금 유입 데이터'
+    ]
+  },
+  {
+    layout: 'metrics',
+    badge: '01. Architecture & Speed',
+    title1: '이론이 아닌 숫자로 증명된',
+    titleHighlight: 'Mysticeti 합의 엔진',
+    title2: '의 압도적 성능',
+    m1Label: '합의 지연 시간', m1Val: '390ms', m1Sub: '▲ L1 중 압도적 1위',
+    m2Label: '최대 처리 속도(TPS)', m2Val: '297,000', m2Sub: '객체 병렬 실행 기반',
+    m3Label: '데이터 구조', m3Val: 'Object', m3Sub: '계좌 병목 완전 제거',
+    p1Bold: '병목 없는 병렬 처리:',
+    p1Text: '모든 자산을 개별 객체(Object)로 취급해, 연관 없는 거래들을 대기 줄 없이 동시에 통과시킵니다.',
+    p2Bold: '온체인 AI & 고빈도 매매 최적화:',
+    p2Text: '0.39초의 최종성(Finality)과 Walrus 스토리지 결합으로 웹2 수준의 반응 속도를 구현합니다.'
+  },
+  {
+    layout: 'versus',
+    badge: '02. L1 Architecture Comparison',
+    title1: '차세대 고성능 L1 정면 승부:',
+    titleHighlight: '솔라나(Solana) vs 수이(Sui)',
+    title2: '',
+    leftName: 'SOLANA (솔라나)',
+    rightName: 'SUI NETWORK (수이)',
+    rows: [
+      { key: '데이터 모델', left: '계좌 기반 (Account)', right: '객체 중심 (Object-centric)' },
+      { key: '합의 지연(Finality)', left: '약 2.5초 ~ 12초', right: '0.39초 (Mysticeti 엔진)' },
+      { key: '트래픽 폭주 시', left: '동일 계좌 충돌·수수료 급등', right: '독립 객체 우회 처리 (수수료 일정)' },
+      { key: '스마트 컨트랙트', left: 'Rust 기반', right: 'Sui Move (자산 보안 특화)' }
+    ],
+    verdict: '핵심 요약: 솔라나가 유동성 1위지만, 아키텍처 확장성과 보안성에서는 수이가 명확한 기술적 우위를 점하고 있습니다.'
+  },
+  {
+    layout: 'deepdive',
+    badge: '03. Thesis & Risk Check',
+    title1: '투자자가 반드시 체크해야 할',
+    titleHighlight: '핵심 모멘텀 & 리스크 조건',
+    title2: '',
+    chartImage: '',
+    boxes: [
+      { tag: 'BULL CASE (상승 동력)', title: '네이티브 USDC + 기관 신탁 유입', desc: '그레이스케일 SUI 신탁과 브릿지 없는 네이티브 USDC 탑재로 디파이(NAVI, Suilend, Cetus) TVL이 구조적으로 우상향하고 있습니다.' },
+      { tag: 'TECH CATALYST (기술 모멘텀)', title: 'Walrus 스토리지 × 온체인 AI', desc: '대용량 AI 학습 데이터셋과 에이전트 메모리를 가장 싸고 빠르게 처리할 수 있는 유일한 L1 인프라로 포지셔닝했습니다.' },
+      { tag: 'INVALIDATION (이 뷰가 틀릴 조건)', title: '물량 언락 소화 실패 & 초고속 EVM 등장', desc: '매월 나오는 재단/VC 언락 물량을 신규 유동성이 받아내지 못하거나, 모나드(Monad) 등 EVM 진영이 개발자를 독식할 경우 비중을 축소해야 합니다.' }
+    ]
+  }
+];
+
+let state = {
+  theme: 'blue',
+  category: 'SUI ECOSYSTEM RESEARCH',
+  issue: 'OCT 2026 | ISSUE #01',
+  handle: '@Sui_Alpha_KR',
+  currentIndex: 0,
+  slides: JSON.parse(JSON.stringify(defaultSlides))
+};
+
+const saved = localStorage.getItem('sui_carousel_state_v3');
+if (saved) {
+  try { state = JSON.parse(saved); } catch(e) {}
+}
+
+function saveState() {
+  localStorage.setItem('sui_carousel_state_v3', JSON.stringify(state));
+}
+
+function getThemeColors() {
+  const map = {
+    blue: {
+      orb1: 'rgba(56, 152, 255, 0.28)', orb2: 'rgba(16, 185, 129, 0.14)',
+      grad: 'from-blue-400 via-cyan-300 to-emerald-300',
+      accentText: 'text-blue-400', accentBg: 'bg-blue-500/15', accentBorder: 'border-blue-500/35',
+      dot: 'bg-blue-400 shadow-[0_0_12px_#60a5fa]'
+    },
+    emerald: {
+      orb1: 'rgba(16, 185, 129, 0.28)', orb2: 'rgba(56, 189, 248, 0.14)',
+      grad: 'from-emerald-400 via-teal-200 to-cyan-400',
+      accentText: 'text-emerald-400', accentBg: 'bg-emerald-500/15', accentBorder: 'border-emerald-500/35',
+      dot: 'bg-emerald-400 shadow-[0_0_12px_#34d399]'
+    },
+    purple: {
+      orb1: 'rgba(168, 85, 247, 0.28)', orb2: 'rgba(236, 72, 153, 0.14)',
+      grad: 'from-purple-400 via-fuchsia-300 to-indigo-300',
+      accentText: 'text-purple-400', accentBg: 'bg-purple-500/15', accentBorder: 'border-purple-500/35',
+      dot: 'bg-purple-400 shadow-[0_0_12px_#c084fc]'
+    },
+    amber: {
+      orb1: 'rgba(245, 158, 11, 0.26)', orb2: 'rgba(59, 130, 246, 0.14)',
+      grad: 'from-amber-400 via-yellow-200 to-orange-400',
+      accentText: 'text-amber-400', accentBg: 'bg-amber-500/15', accentBorder: 'border-amber-500/35',
+      dot: 'bg-amber-400 shadow-[0_0_12px_#fbbf24]'
+    }
+  };
+  return map[state.theme] || map.blue;
+}
+
+function renderTabs() {
+  const container = document.getElementById('slideTabs');
+  document.getElementById('slideCountText').innerText = state.slides.length;
+  container.innerHTML = state.slides.map((s, idx) => {
+    const active = idx === state.currentIndex;
+    const layoutLabel = { cover: '표지', metrics: '지표', versus: 'VS비교', deepdive: '심층' }[s.layout] || '카드';
+    return `<button onclick="selectSlide(${idx})" class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition border ${
+      active ? 'bg-blue-600 text-white border-blue-400 shadow' : 'bg-slate-800/90 text-slate-400 border-slate-700 hover:text-white'
+    }">${idx + 1}P · ${layoutLabel}</button>`;
+  }).join('');
+
+  const curLayout = state.slides[state.currentIndex].layout;
+  ['cover', 'metrics', 'versus', 'deepdive'].forEach(l => {
+    const btn = document.getElementById('btn-' + l);
+    if (l === curLayout) {
+      btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold border bg-blue-600/30 border-blue-400 text-white';
+    } else {
+      btn.className = 'py-1.5 px-2 rounded-lg text-xs font-bold border bg-slate-900 border-slate-800 text-slate-400 hover:text-white';
+    }
+  });
+}
+
+function renderForm() {
+  const s = state.slides[state.currentIndex];
+  const form = document.getElementById('dynamicForm');
+  let html = `
+    <div class="grid grid-cols-2 gap-2">
+      <div class="col-span-2">
+        <label>소제목 배지 (Tag)</label>
+        <input type="text" value="${escapeHtml(s.badge || '')}" oninput="updateField('badge', this.value)">
+      </div>
+      <div class="col-span-2">
+        <label>메인 제목 (첫 줄)</label>
+        <input type="text" value="${escapeHtml(s.title1 || '')}" oninput="updateField('title1', this.value)">
+      </div>
+      <div>
+        <label>강조 제목 (그라데이션 구간)</label>
+        <input type="text" value="${escapeHtml(s.titleHighlight || '')}" oninput="updateField('titleHighlight', this.value)">
+      </div>
+      <div>
+        <label>제목 마무리</label>
+        <input type="text" value="${escapeHtml(s.title2 || '')}" oninput="updateField('title2', this.value)">
+      </div>
+    </div>
+  `;
+
+  if (s.layout === 'cover') {
+    html += `
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <div>
+          <label>서브 타이틀 설명</label>
+          <textarea rows="2" oninput="updateField('subtitle', this.value)">${escapeHtml(s.subtitle || '')}</textarea>
+        </div>
+        <label>표지 목차 / 핵심 요약 3줄</label>
+        <input type="text" value="${escapeHtml((s.bullets && s.bullets[0]) || '')}" oninput="updateBullet(0, this.value)" placeholder="목차 1">
+        <input type="text" value="${escapeHtml((s.bullets && s.bullets[1]) || '')}" oninput="updateBullet(1, this.value)" placeholder="목차 2">
+        <input type="text" value="${escapeHtml((s.bullets && s.bullets[2]) || '')}" oninput="updateBullet(2, this.value)" placeholder="목차 3">
+      </div>
+    `;
+  } else if (s.layout === 'metrics') {
+    html += `
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <label class="text-blue-300">📊 데이터 박스 3개 (라벨 / 수치 / 부연설명)</label>
+        <div class="grid grid-cols-3 gap-1.5">
+          <input type="text" value="${escapeHtml(s.m1Label||'')}" oninput="updateField('m1Label', this.value)">
+          <input type="text" value="${escapeHtml(s.m1Val||'')}" oninput="updateField('m1Val', this.value)">
+          <input type="text" value="${escapeHtml(s.m1Sub||'')}" oninput="updateField('m1Sub', this.value)">
+        </div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <input type="text" value="${escapeHtml(s.m2Label||'')}" oninput="updateField('m2Label', this.value)">
+          <input type="text" value="${escapeHtml(s.m2Val||'')}" oninput="updateField('m2Val', this.value)">
+          <input type="text" value="${escapeHtml(s.m2Sub||'')}" oninput="updateField('m2Sub', this.value)">
+        </div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <input type="text" value="${escapeHtml(s.m3Label||'')}" oninput="updateField('m3Label', this.value)">
+          <input type="text" value="${escapeHtml(s.m3Val||'')}" oninput="updateField('m3Val', this.value)">
+          <input type="text" value="${escapeHtml(s.m3Sub||'')}" oninput="updateField('m3Sub', this.value)">
+        </div>
+        <div class="pt-2 space-y-2">
+          <label>인사이트 01 (강조 제목 & 내용)</label>
+          <input type="text" value="${escapeHtml(s.p1Bold||'')}" oninput="updateField('p1Bold', this.value)">
+          <textarea rows="2" oninput="updateField('p1Text', this.value)">${escapeHtml(s.p1Text||'')}</textarea>
+          <label>인사이트 02 (강조 제목 & 내용)</label>
+          <input type="text" value="${escapeHtml(s.p2Bold||'')}" oninput="updateField('p2Bold', this.value)">
+          <textarea rows="2" oninput="updateField('p2Text', this.value)">${escapeHtml(s.p2Text||'')}</textarea>
+        </div>
+      </div>
+    `;
+  } else if (s.layout === 'versus') {
+    html += `
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <div class="grid grid-cols-2 gap-2">
+          <div><label>좌측 비교 대상</label><input type="text" value="${escapeHtml(s.leftName||'')}" oninput="updateField('leftName', this.value)"></div>
+          <div><label>우측 주인공 (하이라이트)</label><input type="text" value="${escapeHtml(s.rightName||'')}" oninput="updateField('rightName', this.value)"></div>
+        </div>
+        <label class="text-blue-300">⚔️ 비교 항목 4줄 (기준 / 좌측 / 우측)</label>
+        ${(s.rows || []).map((r, i) => `
+          <div class="grid grid-cols-3 gap-1.5">
+            <input type="text" value="${escapeHtml(r.key)}" oninput="updateVsRow(${i}, 'key', this.value)">
+            <input type="text" value="${escapeHtml(r.left)}" oninput="updateVsRow(${i}, 'left', this.value)">
+            <input type="text" value="${escapeHtml(r.right)}" oninput="updateVsRow(${i}, 'right', this.value)">
+          </div>
+        `).join('')}
+        <div>
+          <label>하단 한 줄 결론 (Verdict)</label>
+          <textarea rows="2" oninput="updateField('verdict', this.value)">${escapeHtml(s.verdict||'')}</textarea>
+        </div>
+      </div>
+    `;
+  } else if (s.layout === 'deepdive') {
+    html += `
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <div>
+          <label class="text-emerald-400">🖼️ 차트/온체인 캡처 이미지 삽입 (선택사항 - 넣으면 상단에 표시됨)</label>
+          <div class="flex gap-2 items-center">
+            <input type="file" accept="image/*" onchange="uploadChartImage(event)" class="text-xs">
+            <button onclick="updateField('chartImage', ''); renderCanvas();" class="bg-slate-800 px-2.5 py-1.5 rounded text-xs whitespace-nowrap">이미지 제거</button>
+          </div>
+        </div>
+        ${(s.boxes || []).map((b, i) => `
+          <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 space-y-1.5">
+            <div class="grid grid-cols-2 gap-1.5">
+              <input type="text" value="${escapeHtml(b.tag)}" oninput="updateDeepBox(${i}, 'tag', this.value)" placeholder="태그">
+              <input type="text" value="${escapeHtml(b.title)}" oninput="updateDeepBox(${i}, 'title', this.value)" placeholder="소제목">
+            </div>
+            <textarea rows="2" oninput="updateDeepBox(${i}, 'desc', this.value)">${escapeHtml(b.desc)}</textarea>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  form.innerHTML = html;
+}
+
+function renderCanvas() {
+  const s = state.slides[state.currentIndex];
+  const t = getThemeColors();
+  const total = state.slides.length;
+  const cur = state.currentIndex + 1;
+
+  document.getElementById('orbTop').style.background = `radial-gradient(circle, ${t.orb1} 0%, rgba(0,0,0,0) 70%)`;
+  document.getElementById('orbBottom').style.background = `radial-gradient(circle, ${t.orb2} 0%, rgba(0,0,0,0) 70%)`;
+  document.getElementById('themeDot').className = `w-2.5 h-2.5 rounded-full ${t.dot}`;
+  
+  const catEl = document.getElementById('canvasCategory');
+  catEl.className = `text-[11px] font-extrabold tracking-[0.22em] uppercase ${t.accentText}`;
+  catEl.innerText = state.category;
+
+  document.getElementById('canvasIssue').innerText = state.issue;
+  document.getElementById('canvasHandle').innerText = state.handle;
+  document.getElementById('canvasPageBadge').innerText = `${String(cur).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
+  document.getElementById('previewPageIndicator').innerText = `${cur} / ${total}`;
+  document.getElementById('swipeHint').style.display = cur < total ? 'inline-block' : 'none';
+  document.getElementById('canvasRightFoot').className = `font-mono font-semibold ${t.accentText}`;
+
+  const body = document.getElementById('canvasBody');
+
+  const titleBlock = `
+    <div class="mb-5">
+      <div class="inline-block ${t.accentBg} border ${t.accentBorder} ${t.accentText} text-[11px] font-bold px-3 py-1 rounded-md mb-2.5 tracking-wide">
+        ${escapeHtml(s.badge || '')}
+      </div>
+      <h1 class="${s.layout === 'cover' ? 'text-[34px]' : 'text-[27px]'} font-black tracking-tight leading-[1.26] text-white">
+        ${escapeHtml(s.title1 || '')}<br>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r ${t.grad}">${escapeHtml(s.titleHighlight || '')}</span><span>${escapeHtml(s.title2 || '')}</span>
+      </h1>
+    </div>
+  `;
+
+  if (s.layout === 'cover') {
+    body.innerHTML = `
+      <div class="space-y-6 my-auto">
+        ${titleBlock}
+        <p class="text-sm text-slate-300 leading-relaxed border-l-2 border-blue-400 pl-3.5">
+          ${escapeHtml(s.subtitle || '')}
+        </p>
+        <div class="glass-box p-5 rounded-2xl space-y-3">
+          <div class="text-[11px] font-bold ${t.accentText} uppercase tracking-wider">INSIDE THIS THREAD</div>
+          ${(s.bullets || []).map((b, idx) => `
+            <div class="flex items-start gap-3 text-xs text-slate-100">
+              <span class="font-mono font-bold ${t.accentText} bg-slate-900/90 px-2 py-0.5 rounded border border-slate-700">0${idx+1}</span>
+              <span class="leading-relaxed pt-0.5 font-medium">${escapeHtml(b)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else if (s.layout === 'metrics') {
+    body.innerHTML = `
+      <div class="space-y-4">
+        ${titleBlock}
+        <div class="grid grid-cols-3 gap-3">
+          <div class="glass-box p-4 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">${escapeHtml(s.m1Label||'')}</div>
+            <div class="text-2xl font-black ${t.accentText} font-mono">${escapeHtml(s.m1Val||'')}</div>
+            <div class="text-[10px] text-emerald-400 mt-1 font-medium">${escapeHtml(s.m1Sub||'')}</div>
+          </div>
+          <div class="glass-box p-4 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">${escapeHtml(s.m2Label||'')}</div>
+            <div class="text-2xl font-black text-white font-mono">${escapeHtml(s.m2Val||'')}</div>
+            <div class="text-[10px] text-slate-400 mt-1">${escapeHtml(s.m2Sub||'')}</div>
+          </div>
+          <div class="glass-box p-4 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">${escapeHtml(s.m3Label||'')}</div>
+            <div class="text-2xl font-extrabold text-cyan-300 font-mono">${escapeHtml(s.m3Val||'')}</div>
+            <div class="text-[10px] text-slate-400 mt-1">${escapeHtml(s.m3Sub||'')}</div>
+          </div>
+        </div>
+        <div class="glass-box p-5 rounded-xl space-y-3 text-xs text-slate-200 leading-relaxed">
+          <div class="flex items-start gap-2.5">
+            <span class="${t.accentText} font-mono font-bold">01</span>
+            <p><strong class="text-white">${escapeHtml(s.p1Bold||'')}</strong> ${escapeHtml(s.p1Text||'')}</p>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <span class="${t.accentText} font-mono font-bold">02</span>
+            <p><strong class="text-white">${escapeHtml(s.p2Bold||'')}</strong> ${escapeHtml(s.p2Text||'')}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (s.layout === 'versus') {
+    body.innerHTML = `
+      <div class="space-y-4">
+        ${titleBlock}
+        <div class="glass-box rounded-xl overflow-hidden border border-slate-800">
+          <div class="grid grid-cols-12 bg-slate-900/95 text-[11px] font-bold py-2.5 px-4 border-b border-slate-800">
+            <div class="col-span-3 text-slate-400">비교 기준</div>
+            <div class="col-span-4 text-slate-300">${escapeHtml(s.leftName||'')}</div>
+            <div class="col-span-5 ${t.accentText}">${escapeHtml(s.rightName||'')}</div>
+          </div>
+          ${(s.rows || []).map(r => `
+            <div class="grid grid-cols-12 items-center py-2.5 px-4 text-xs border-b border-slate-800/60 last:border-none">
+              <div class="col-span-3 font-semibold text-slate-400 text-[11px]">${escapeHtml(r.key)}</div>
+              <div class="col-span-4 text-slate-300 pr-2 text-[11px]">${escapeHtml(r.left)}</div>
+              <div class="col-span-5 font-bold text-white bg-blue-500/10 border border-blue-500/20 px-2.5 py-1 rounded-md text-[11px]">${escapeHtml(r.right)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="glass-box p-3.5 rounded-xl text-xs text-slate-200 border-l-4 border-blue-400">
+          ${escapeHtml(s.verdict||'')}
+        </div>
+      </div>
+    `;
+  } else if (s.layout === 'deepdive') {
+    const hasImg = s.chartImage && s.chartImage.length > 10;
+    const boxesToShow = hasImg ? (s.boxes || []).slice(0, 2) : (s.boxes || []);
+    body.innerHTML = `
+      <div class="space-y-3.5">
+        ${titleBlock}
+        ${hasImg ? `
+          <div class="w-full h-36 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 flex items-center justify-center">
+            <img src="${s.chartImage}" class="w-full h-full object-cover">
+          </div>
+        ` : ''}
+        <div class="space-y-2.5">
+          ${boxesToShow.map((b, i) => `
+            <div class="glass-box p-3.5 rounded-xl">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-[10px] font-mono font-extrabold ${i === 2 ? 'text-rose-400' : t.accentText}">${escapeHtml(b.tag)}</span>
+              </div>
+              <div class="text-xs font-bold text-white mb-0.5">${escapeHtml(b.title)}</div>
+              <div class="text-[11px] text-slate-300 leading-relaxed">${escapeHtml(b.desc)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+}
+
+function selectSlide(idx) {
+  state.currentIndex = idx;
+  saveState();
+  renderTabs();
+  renderForm();
+  renderCanvas();
+}
+
+function prevSlide() {
+  if (state.currentIndex > 0) selectSlide(state.currentIndex - 1);
+}
+
+function nextSlide() {
+  if (state.currentIndex < state.slides.length - 1) selectSlide(state.currentIndex + 1);
+}
+
+function setLayout(layoutName) {
+  const cur = state.slides[state.currentIndex];
+  cur.layout = layoutName;
+  if (layoutName === 'cover' && !cur.bullets) {
+    cur.subtitle = '핵심 아키텍처와 온체인 데이터를 기반으로 분석한 리서치 요약';
+    cur.bullets = ['핵심 포인트 01', '핵심 포인트 02', '핵심 포인트 03'];
+  }
+  if (layoutName === 'metrics' && !cur.m1Label) {
+    cur.m1Label = '지표 1'; cur.m1Val = '390ms'; cur.m1Sub = '설명 1';
+    cur.m2Label = '지표 2'; cur.m2Val = '297K'; cur.m2Sub = '설명 2';
+    cur.m3Label = '지표 3'; cur.m3Val = 'Object'; cur.m3Sub = '설명 3';
+    cur.p1Bold = '핵심 요점 1:'; cur.p1Text = '상세 내용을 입력하세요.';
+    cur.p2Bold = '핵심 요점 2:'; cur.p2Text = '상세 내용을 입력하세요.';
+  }
+  if (layoutName === 'versus' && !cur.rows) {
+    cur.leftName = '경쟁 체인'; cur.rightName = 'SUI NETWORK';
+    cur.rows = [
+      { key: '데이터 구조', left: 'Account 기반', right: 'Object 중심' },
+      { key: '최종성 속도', left: '2.5초+', right: '0.39초' },
+      { key: '병렬 실행', left: '사전 상태 선언 필요', right: '객체 단위 완전 병렬' },
+      { key: '보안 언어', left: 'Rust / Solidity', right: 'Sui Move' }
+    ];
+    cur.verdict = '결론: 수이는 객체 모델을 통해 근본적인 상태 병목을 해결했습니다.';
+  }
+  if (layoutName === 'deepdive' && !cur.boxes) {
+    cur.boxes = [
+      { tag: 'POINT 01', title: '첫 번째 핵심 근거', desc: '상세 데이터 및 분석 내용을 입력하세요.' },
+      { tag: 'POINT 02', title: '두 번째 핵심 근거', desc: '상세 데이터 및 분석 내용을 입력하세요.' },
+      { tag: 'RISK CHECK', title: '이 시나리오가 틀릴 조건', desc: '반드시 체크해야 할 리스크 요인을 명시하세요.' }
+    ];
+  }
+  saveState();
+  renderTabs();
+  renderForm();
+  renderCanvas();
+}
+
+function updateField(key, val) {
+  state.slides[state.currentIndex][key] = val;
+  saveState();
+  renderCanvas();
+}
+
+function updateBullet(idx, val) {
+  state.slides[state.currentIndex].bullets[idx] = val;
+  saveState();
+  renderCanvas();
+}
+
+function updateVsRow(idx, key, val) {
+  state.slides[state.currentIndex].rows[idx][key] = val;
+  saveState();
+  renderCanvas();
+}
+
+function updateDeepBox(idx, key, val) {
+  state.slides[state.currentIndex].boxes[idx][key] = val;
+  saveState();
+  renderCanvas();
+}
+
+function uploadChartImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    state.slides[state.currentIndex].chartImage = evt.target.result;
+    saveState();
+    renderCanvas();
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateGlobal() {
+  state.category = document.getElementById('gCategory').value;
+  state.issue = document.getElementById('gIssue').value;
+  state.handle = document.getElementById('gHandle').value;
+  saveState();
+  renderCanvas();
+}
+
+function changeGlobalTheme(val) {
+  state.theme = val;
+  saveState();
+  renderCanvas();
+}
+
+function addSlide() {
+  const newSlide = JSON.parse(JSON.stringify(defaultSlides[1]));
+  newSlide.badge = `0${state.slides.length}. Additional Insight`;
+  state.slides.push(newSlide);
+  selectSlide(state.slides.length - 1);
+}
+
+function DuplicateSlide() {
+  const copy = JSON.parse(JSON.stringify(state.slides[state.currentIndex]));
+  state.slides.splice(state.currentIndex + 1, 0, copy);
+  selectSlide(state.currentIndex + 1);
+}
+
+function deleteSlide() {
+  if (state.slides.length <= 1) return alert('최소 1장의 슬라이드는 남아있어야 합니다.');
+  state.slides.splice(state.currentIndex, 1);
+  state.currentIndex = Math.max(0, state.currentIndex - 1);
+  selectSlide(state.currentIndex);
+}
+
+function resetDefault() {
+  if (!confirm('작성 중인 내용을 초기화하고 기본 4장 세트로 되돌릴까요?')) return;
+  state.slides = JSON.parse(JSON.stringify(defaultSlides));
+  state.currentIndex = 0;
+  saveState();
+  init();
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function downloadCurrentPNG() {
+  const target = document.getElementById('cardCanvas');
+  const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#060a12', useCORS: true });
+  const link = document.createElement('a');
+  const pageNum = String(state.currentIndex + 1).padStart(2, '0');
+  link.download = `sui-card-${pageNum}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+async function downloadAllZIP() {
+  const btn = document.getElementById('zipBtn');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ 고해상도 렌더링 중...';
+  btn.disabled = true;
+
+  const zip = new JSZip();
+  const origIdx = state.currentIndex;
+  const target = document.getElementById('cardCanvas');
+
+  for (let i = 0; i < state.slides.length; i++) {
+    state.currentIndex = i;
+    renderCanvas();
+    await new Promise(r => setTimeout(r, 120));
+    const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#060a12', useCORS: true });
+    const dataUrl = canvas.toDataURL('image/png').split(',')[1];
+    const pageNum = String(i + 1).padStart(2, '0');
+    zip.file(`sui-carousel-${pageNum}.png`, dataUrl, { base64: true });
+  }
+
+  state.currentIndex = origIdx;
+  renderTabs();
+  renderForm();
+  renderCanvas();
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const link = document.createElement('a');
+  link.download = `sui-carousel-${Date.now()}.zip`;
+  link.href = URL.createObjectURL(content);
+  link.click();
+
+  btn.innerHTML = origText;
+  btn.disabled = false;
+}
+
+function init() {
+  document.getElementById('themeSelect').value = state.theme;
+  document.getElementById('gCategory').value = state.category;
+  document.getElementById('gIssue').value = state.issue;
+  document.getElementById('gHandle').value = state.handle;
+  renderTabs();
+  renderForm();
+  renderCanvas();
+}
+
+init();
+</script>
+</body>
+</html>
